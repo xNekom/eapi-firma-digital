@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="firmar-documento">
+    <http:listener path="/api/v1/firma" config-ref="HTTP_Listener_EAPI_config" allowedMethods="POST" doc:name="Recibir documento para firma"/>
+    <ee:transform doc:name="Transform Message" doc:id="71a2e520-4c47-4ccb-b5f7-79690bce347f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output multipart/form-data
+---
+{
+    parts: {
+        "documento": payload.parts.documento,
+        "email": payload.parts.email,
+        "nombre": payload.parts.nombre,
+        "apellido": payload.parts.apellido,
+        "telefono": payload.parts.telefono
+    }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" path="/firma" doc:name="Enviar a PAPI Signaturit" config-ref="HTTP_Request_PAPI_config">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Accept" : "application/json",
+	"Content-Type" : "multipart/form-data"
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="b6832293-228e-4f77-9d44-fb735b7f6003" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: payload.status,
+    message: payload.message,
+    data: payload.data
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="179546f7-d802-43bf-8f07-be7f6cb9f95f" message='#["Documento enviado a firma - ID: " ++ payload.data.signature_id]'/>
+
+</flow>
+	<flow name="obtener-documento-firmado" doc:id="c223ba8c-24c7-429c-8930-b1b79ad12bef" >
+		<http:listener doc:name="Listener" doc:id="511db43e-a0ac-4e06-8ba0-f8a3168bcf2c" config-ref="HTTP_Listener_EAPI_config" path="/api/v1/firma/{signatureId}/documento/{documentId}" allowedMethods="GET"/>
+		<http:request method="GET" doc:name="Request" doc:id="85bb1350-1526-4979-b621-a75034caf257" config-ref="HTTP_Request_PAPI_config" path="/documento/{signatureId}/{documentId}">
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"documentId" : attributes.uriParams.documentId,
+	"signatureId" : attributes.uriParams.signatureId
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="34b4f97e-3c0e-48de-a280-13dfd7f62f94" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "SUCCESS",
+	data: payload.data
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="f666907b-b2b4-4f45-91a5-490325a57ca3" message='#["Documento obtenido: " ++ attributes.uriParams.documentId]'/>
+	</flow>
+	<flow name="consultar-estado" doc:id="ea67d374-eef9-4a5a-8224-7bc12430d40d" >
+		<http:listener doc:name="Listener" doc:id="5de2a7e3-a428-4371-8a37-28fc602f824a" config-ref="HTTP_Listener_EAPI_config" path="/api/v1/estado/{signatureId}" allowedMethods="GET"/>
+		<http:request method="GET" doc:name="Request" doc:id="b42d135b-a734-4cea-b826-76db3d6aaa03" config-ref="HTTP_Request_PAPI_config" path="/estado/{signatureId}">
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"signatureId" : attributes.uriParams.signatureId
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="68bb1132-6d96-4ac1-a7a6-a4f4d5e4e900" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    timestamp: now(),
+    status: payload.status,
+    data: {
+        firma: {
+            id: payload.data.signature_id,
+            estado: payload.data.estado,
+            documento: {
+                id: payload.data.documento.id,
+                estado: payload.data.documento.estado
+            }
+        },
+        metadata: {
+            consultadoEn: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"}
+        }
+    }
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="06b7567a-619f-4045-b1cd-2f868eeda256" message="payload"/>
+	</flow>
+</mule>

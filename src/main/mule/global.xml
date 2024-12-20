@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<http:listener-config name="HTTP_Listener_EAPI_config" doc:name="HTTP Listener config">
+        <http:listener-connection host="localhost" port="8081" />
+    </http:listener-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="37633dfe-6655-4fb3-9125-43aeb7ea2320" file="config.yaml" />
+	<http:request-config name="HTTP_Request_PAPI_config" doc:name="HTTP Request configuration" doc:id="918eb82f-af63-4f20-9905-c580913a7564" >
+		<http:request-connection host="localhost" port="8083" />
+	</http:request-config>
+
+</mule>
