@@ -89,15 +89,15 @@ output application/json
     status: payload.status,
     data: {
         firma: {
-            id: payload.data.signature_id,
-            estado: payload.data.estado,
+            id: payload.data.firma.id,
+            estado: payload.data.firma.estado,
             documento: {
-                id: payload.data.documento.id,
-                estado: payload.data.documento.estado
+                id: payload.data.firma.documento.id,
+                estado: payload.data.firma.documento.estado
             }
         },
         metadata: {
-            consultadoEn: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"}
+            consultadoEn: payload.data.metadata.consultadoEn
         }
     }
 }
