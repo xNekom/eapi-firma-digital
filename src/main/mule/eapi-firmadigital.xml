@@ -106,4 +106,27 @@ output application/json
 		</ee:transform>
 		<logger level="INFO" doc:name="Logger" doc:id="06b7567a-619f-4045-b1cd-2f868eeda256" message="payload"/>
 	</flow>
+	<flow name="webhook" doc:id="f9652496-6416-4ee3-927f-1099d25f0574" >
+		<http:listener doc:name="Listener" doc:id="e023cee2-1eb9-4467-ac09-d07e40b0651d" config-ref="HTTP_Listener_EAPI_config" path="/webhook" allowedMethods="POST" />
+		<logger level="INFO" doc:name="Logger" doc:id="44dabd0d-efba-4aae-a3ac-586351d869fa" message='#["Webhook recibido: " ++ write(payload, "application/json")]' />
+		<ee:transform doc:name="Transform Message" doc:id="34cb0587-88f3-4ce1-b228-750e2486d8ac" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    evento: payload.event_type,
+    estado_firma: payload.signature.status,
+    fecha_evento: payload.signature.delivered_at,
+    datos_documento: {
+        signature_id: payload.signature.id,
+        document_id: payload.signature.documents[0].id,
+        email_firmante: payload.signature.documents[0].email
+    }
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="GET" doc:name="Request" doc:id="62ff3e38-06a5-494e-a3c5-c9d11295cc02" config-ref="HTTP_Request_PAPI_config" path="/webhook"/>
+	</flow>
 </mule>
