@@ -18,7 +18,8 @@ output multipart/form-data
         "email": payload.parts.email,
         "nombre": payload.parts.nombre,
         "apellido": payload.parts.apellido,
-        "telefono": payload.parts.telefono
+        "telefono": payload.parts.telefono,
+        "webhook_url": "https://www.eapi-firmadigital.us-e2.cloudhub.io/api/v1/signaturit"
     }
 }]]></ee:set-payload>
 			</ee:message>
@@ -105,5 +106,22 @@ output application/json
 			</ee:message>
 		</ee:transform>
 		<logger level="INFO" doc:name="Logger" doc:id="06b7567a-619f-4045-b1cd-2f868eeda256" message="payload"/>
+	</flow>
+	<flow name="webhook-flow" doc:id="6ac2806c-aeba-4c86-8314-78a3d44c6278" >
+		<http:listener doc:name="Listener" doc:id="c00e7d3c-d974-49bb-8c72-c57f3cba880a" config-ref="HTTP_Listener_EAPI_config" path="/api/v1/webhook/signaturit" allowedMethods="POST"/>
+		<logger level="INFO" doc:name="Logger" doc:id="6bfa9799-0f06-400d-a5a5-c85f810cfadc" message='#["Webhook recibido - Evento " ++ payload.event_type ++ " - Signature ID: " ++ payload.signature.id]'/>
+		<ee:transform doc:name="Transform Message" doc:id="23818578-72a3-408e-af6c-237fff27d0f5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    status: "SUCCESS",
+    message: "Webhook recibido correctamente",
+    event: payload.event_type,
+    signature_id: payload.signature.id
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
 	</flow>
 </mule>
