@@ -108,7 +108,7 @@ output application/json
 	</flow>
 	<flow name="webhook-flow" doc:id="6ac2806c-aeba-4c86-8314-78a3d44c6278" >
 		<http:listener doc:name="Listener" doc:id="c00e7d3c-d974-49bb-8c72-c57f3cba880a" config-ref="HTTP_Listener_EAPI_config" path="/api/v1/webhook/signaturit" allowedMethods="POST"/>
-		<logger level="INFO" doc:name="Logger" doc:id="6bfa9799-0f06-400d-a5a5-c85f810cfadc" message='#["Webhook recibido - Evento " ++ payload.event_type ++ " - Signature ID: " ++ payload.signature.id]'/>
+		<logger level="INFO" doc:name="Logger" doc:id="6bfa9799-0f06-400d-a5a5-c85f810cfadc" message='#[payload]'/>
 		<ee:transform doc:name="Transform Message" doc:id="23818578-72a3-408e-af6c-237fff27d0f5" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
