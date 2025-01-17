@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-	xmlns:http="http://www.mulesoft.org/schema/mule/http"
-	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
-http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
-	<os:object-store name="signatureStore" doc:name="Object store" doc:id="0bad927b-e43a-42e5-9cac-2c02fed93f04" maxEntries="-1" entryTtl="24" entryTtlUnit="HOURS" />
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 	<flow name="firmar-documento">
     <http:listener path="/api/v1/firma" config-ref="HTTP_Listener_EAPI_config" allowedMethods="POST" doc:name="Recibir documento para firma"/>
     <ee:transform doc:name="Transform Message" doc:id="71a2e520-4c47-4ccb-b5f7-79690bce347f">
@@ -20,7 +18,7 @@ output multipart/form-data
         "email": payload.parts.email,
         "nombre": payload.parts.nombre,
         "apellido": payload.parts.apellido,
-        "telefono": payload.parts.telefono
+        "telefono": payload.parts.telefono,
     }
 }]]></ee:set-payload>
 			</ee:message>
@@ -47,13 +45,6 @@ output application/json
 			</ee:message>
 		</ee:transform>
 		<logger level="INFO" doc:name="Logger" doc:id="179546f7-d802-43bf-8f07-be7f6cb9f95f" message='#["Documento enviado a firma - ID: " ++ payload.data.signature_id]'/>
-		<os:store doc:name="signatureStore" doc:id="9279b44c-2222-4b0b-9e62-edd3aef51cf9" objectStore="signatureStore" key="firma-actual">
-			<os:value ><![CDATA[#[{
-        signatureId: payload.data.signature_id,
-        documentId: payload.data.document_id,
-        estado: payload.data.estado
-    }]]]></os:value>
-		</os:store>
 
 </flow>
 	<flow name="obtener-documento-firmado" doc:id="c223ba8c-24c7-429c-8930-b1b79ad12bef" >
@@ -115,63 +106,21 @@ output application/json
 		</ee:transform>
 		<logger level="INFO" doc:name="Logger" doc:id="06b7567a-619f-4045-b1cd-2f868eeda256" message="payload"/>
 	</flow>
-	<flow name="webhook" doc:id="9338b612-d434-4a88-a4b8-49299e90b396" >
-		<http:listener doc:name="Listener" doc:id="39d9e0a3-85c6-410a-863f-16f0a69a9302" config-ref="HTTP_Listener_EAPI_config" path="/webhook" allowedMethods="POST" />
-		<logger level="INFO" doc:name="Logger" doc:id="3db2941f-10b5-4752-8f86-6ec7a97f1ef0" message='#["Webhook recibido: " ++ write(payload, "application/json")]' />
-		<ee:transform doc:name="Transform Message" doc:id="97b748e0-ae46-4fe3-8cfe-a04a18fcb8ad" >
+	<flow name="webhook-flow" doc:id="6ac2806c-aeba-4c86-8314-78a3d44c6278" >
+		<http:listener doc:name="Listener" doc:id="c00e7d3c-d974-49bb-8c72-c57f3cba880a" config-ref="HTTP_Listener_EAPI_config" path="/api/v1/webhook/signaturit" allowedMethods="POST"/>
+		<logger level="INFO" doc:name="Logger" doc:id="6bfa9799-0f06-400d-a5a5-c85f810cfadc" message='#["Webhook recibido - Evento " ++ payload.event_type ++ " - Signature ID: " ++ payload.signature.id]'/>
+		<ee:transform doc:name="Transform Message" doc:id="23818578-72a3-408e-af6c-237fff27d0f5" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 ---
 {
-    evento: payload.event_type,
-    estado_firma: payload.signature.status,
-    fecha_evento: payload.signature.delivered_at,
-    datos_documento: {
-        signature_id: payload.signature.id,
-        document_id: payload.signature.documents[0].id,
-        email_firmante: payload.signature.documents[0].email
-    }
-}
-]]></ee:set-payload>
+    status: "SUCCESS",
+    message: "Webhook recibido correctamente",
+    event: payload.event_type,
+    signature_id: payload.signature.id
+}]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<http:request method="POST" doc:name="Request" doc:id="e442e605-4457-43a0-b8ad-1e32c1bcdc64" config-ref="HTTP_Request_PAPI_config" path="/webhook-receptor">
-			<http:headers ><![CDATA[#[output application/java
----
-{
-	"Accept" : "applitaction/json",
-	"Content-Type" : "application/json"
-}]]]></http:headers>
-		</http:request>
 	</flow>
-	<flow name="monitor-firma-flow">
-    <scheduler>
-        <scheduling-strategy>
-            <fixed-frequency frequency="1" timeUnit="MINUTES"/>
-        </scheduling-strategy>
-    </scheduler>
-
-    <os:retrieve key="firma-actual" objectStore="signatureStore" target="datosSignature"/>
-    
-    <http:request method="GET" path="/api/v1/estado/{signatureId}" config-ref="HTTP_Request_PAPI_config">
-        <http:uri-params>
-            <![CDATA[#[{
-                signatureId: vars.datosSignature.signatureId
-            }]]]>
-        </http:uri-params>
-    </http:request>
-
-    <logger level="INFO" message='#["Estado actual de la firma: " ++ payload.data.firma.estado]'/>
-
-    <choice>
-        <when expression="#[payload.data.firma.estado == 'completed']">
-            <logger level="INFO" message='#["¡Documento firmado correctamente! ID: " ++ vars.datosSignature.signatureId]'/>
-            <os:remove key="firma-actual" objectStore="signatureStore"/>
-        </when>
-        <otherwise>
-            <logger level="INFO" message='#["Documento pendiente de firma - ID: " ++ vars.datosSignature.signatureId]'/>
-        </otherwise>
-    </choice>
-</flow>
 </mule>
