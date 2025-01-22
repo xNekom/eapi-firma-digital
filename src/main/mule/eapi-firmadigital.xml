@@ -44,10 +44,12 @@ output application/json
 ]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<set-variable value="#[payload.data.signature_id]" doc:name="signatureId" doc:id="ece2ed45-69fc-4438-8d20-606199c607fd" variableName="signatureId"/>
+		<set-variable value="#[payload.data.document_id]" doc:name="documentId" doc:id="ecd92a6d-8a75-4faf-adb7-935f257ca1a6" variableName="documentId"/>
 		<logger level="INFO" doc:name="Logger" doc:id="179546f7-d802-43bf-8f07-be7f6cb9f95f" message='#["Documento enviado a firma - ID: " ++ payload.data.signature_id]'/>
 
 </flow>
-	<flow name="obtener-documento-firmado">
+	<flow name="obtener-documento-firmado" doc:id="1a5ec592-b3d1-467b-a579-000bd0e2cd72">
     <http:listener config-ref="HTTP_Listener_EAPI_config" 
                    path="/api/v1/firma/{signatureId}/documento/{documentId}" 
                    allowedMethods="GET"/>
@@ -116,5 +118,6 @@ output application/json
 }]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<flow-ref doc:name="Flow_to_obtener_documento_firmado" doc:id="6ab652e5-444e-4b15-a36e-bdb9398d6223" name="obtener-documento-firmado"/>
 	</flow>
 </mule>
