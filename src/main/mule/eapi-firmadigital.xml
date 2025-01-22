@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
-	xmlns="http://www.mulesoft.org/schema/mule/core"
-	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
 	<flow name="firmar-documento">
     <http:listener path="/api/v1/firma" config-ref="HTTP_Listener_EAPI_config" allowedMethods="POST" doc:name="Recibir documento para firma"/>
     <ee:transform doc:name="Transform Message" doc:id="71a2e520-4c47-4ccb-b5f7-79690bce347f">
@@ -44,21 +45,22 @@ output application/json
 ]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<set-variable value="#[payload.data.signature_id]" doc:name="signatureId" doc:id="dbfb4ac4-4260-439f-a714-e7cdd00f71c0" variableName="signatureId" />
+		<set-variable value="#[payload.data.document_id]" doc:name="documentId" doc:id="f6e53e26-4caf-473a-a812-8e9f2a77e208" variableName="documentId" />
 		<logger level="INFO" doc:name="Logger" doc:id="179546f7-d802-43bf-8f07-be7f6cb9f95f" message='#["Documento enviado a firma - ID: " ++ payload.data.signature_id]'/>
 
 </flow>
-	<flow name="obtener-documento-firmado">
+	<flow name="obtener-documento-firmado" doc:id="383415eb-6cbc-46f6-b180-cf74729411f5">
     <http:listener config-ref="HTTP_Listener_EAPI_config" 
                    path="/api/v1/firma/{signatureId}/documento/{documentId}" 
                    allowedMethods="GET"/>
     
     <http:request method="GET" config-ref="HTTP_Request_PAPI_config" 
                  path="/documento/{signatureId}/{documentId}">
-        <http:uri-params>
-            <![CDATA[#[{
-                "documentId": attributes.uriParams.documentId,
-                "signatureId": attributes.uriParams.signatureId
-            }]]]>
+        <http:uri-params><![CDATA[#[{
+	"documentId": attributes.uriParams.documentId,
+	"signatureId" : attributes.uriParams.signatureId
+}]]]>
         </http:uri-params>
     </http:request>
     
@@ -100,21 +102,52 @@ output application/json
 		</ee:transform>
 		<logger level="INFO" doc:name="Logger" doc:id="06b7567a-619f-4045-b1cd-2f868eeda256" message="payload"/>
 	</flow>
-	<flow name="webhook-flow" doc:id="6ac2806c-aeba-4c86-8314-78a3d44c6278" >
-		<http:listener doc:name="Listener" doc:id="c00e7d3c-d974-49bb-8c72-c57f3cba880a" config-ref="HTTP_Listener_EAPI_config" path="/api/v1/webhook/signaturit/event.json" allowedMethods="POST"/>
-		<logger level="INFO" doc:name="Logger" doc:id="6bfa9799-0f06-400d-a5a5-c85f810cfadc" message='#["Documento firmado correctamente: " ++ write(payload, "application/json")]'/>
-		<ee:transform doc:name="Transform Message" doc:id="23818578-72a3-408e-af6c-237fff27d0f5" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
+	<flow name="webhook-flow" doc:id="2b72450a-7e68-468a-9f01-d0576dbbce92">
+    <http:listener doc:name="Listener" doc:id="22a10a3c-5343-46b5-81ea-fae0ec45366b" config-ref="HTTP_Listener_EAPI_config" path="/api/v1/webhook/signaturit/event.json" allowedMethods="POST" />
+    <logger level="INFO" doc:name="Logger - Webhook Payload" message='#["Webhook Payload: " ++ write(payload, "application/json")]' />
+    <set-variable variableName="signatureId" value="#[payload.document.signature.id]"/>
+    <set-variable variableName="documentId" value="#[payload.document.id]"/>
+    <logger level="INFO" doc:name="Logger - Before PAPI Call" message='#["signatureId: " ++ vars.signatureId ++ ", documentId: " ++ vars.documentId]' />
+    <until-successful maxRetries="5" doc:name="Until Successful" doc:id="22a5928b-bb8d-4350-9b72-362226439ca1">
+			<try doc:name="Try">
+        <http:request method="GET" config-ref="HTTP_Request_PAPI_config" path="/documento/{signatureId}/{documentId}" responseTimeout="#[300000]">
+            <http:uri-params><![CDATA[#[{
+	"documentId": vars.documentId,
+	"signatureId": vars.signatureId
+}]]]></http:uri-params>
+        </http:request>
+			<error-handler>
+            <on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" type="HTTP:CONNECTIVITY, HTTP:TIMEOUT">
+                <logger level="ERROR" doc:name="Logger" doc:id="f4780c95-d883-435d-a686-1dcb4af509bb" message='#["Error al llamar a la PAPI: " ++ error.description as String]' />
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+                        output application/json
+                        ---
+                        {
+                            "status": "error",
+                            "message": "Error al procesar el documento firmado. Inténtelo de nuevo más tarde."
+                        }]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <set-variable variableName="httpStatus" value="500" doc:name="Set Status 500" />
+            </on-error-propagate>
+        </error-handler>
+    </try>
+			</until-successful>
+    <logger level="INFO" doc:name="Logger" doc:id="1fb96b67-3472-433b-ad85-30ea89ebb835" message='#["PDF almacenado para SignatureID: " ++ vars.signatureId ++ ", DocumentID: " ++ vars.documentId]' />
+    <ee:transform doc:name="Transform Message">
+        <ee:message>
+            <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
-    status: "SUCCESS",
-    message: "Webhook recibido correctamente",
-    event: payload.event_type,
-    signature_id: payload.signature.id
+	"status": "success",
+	"message": "Webhook recibido y procesado correctamente."
 }]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-	</flow>
+        </ee:message>
+    </ee:transform>
+    <set-variable variableName="httpStatus" value="200" doc:name="Set Status 200"/>
+    <set-variable variableName="http$response$headers$'Content-Type'" value="application/json"/>
+</flow>
 </mule>
